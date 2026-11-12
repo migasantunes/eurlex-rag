@@ -62,6 +62,7 @@ Estimated 45 min.
 
 **Goal:** the five regulations as clean, ID-addressed units in six languages.
 
+- Work through [m1-parser-checklist.md](m1-parser-checklist.md)
 - Run `eurlex ingest` on the owner's machine. Settle which download route
   works and the attribution wording (SPEC §2). If neither route works, download
   the 30 files by hand into `data/raw/` and run `eurlex ingest --no-fetch`
