@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eurlex-rag"
+version = "0.1.0"
+description = "An evaluation-driven, cross-lingual RAG system over EU regulation: one retrieval technique per rung, every rung measured."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "José Miguel Luís Antunes" }]
+# The core (IDs, chunking, BM25, metrics, CLI) has no third-party dependencies
+# on purpose: rung 1 and the whole evaluation harness run on the standard library.
+dependencies = []
+
+[project.optional-dependencies]
+# M1: download and parse the regulations.
+ingest = ["httpx>=0.27", "beautifulsoup4>=4.12", "lxml>=5.2"]
+# M3: dense retrieval. Versions are a floor; pin exact ones in configs at M3.
+dense = ["sentence-transformers>=3.0", "psycopg[binary]>=3.2", "pgvector>=0.3", "numpy>=1.26"]
+# M5-M7: the HTTP service.
+serve = ["fastapi>=0.111", "uvicorn[standard]>=0.30", "pydantic>=2.7"]
+# M6: the agent. Used in eurlex_rag/agent only.
+agent = ["langgraph>=0.2"]
+dev = ["pytest>=8", "ruff>=0.5", "httpx>=0.27", "beautifulsoup4>=4.12", "lxml>=5.2"]
+
+[project.scripts]
+eurlex = "eurlex_rag.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "slow: needs a model download, a database or the network (deselected in CI)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
