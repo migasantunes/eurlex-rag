@@ -1,0 +1,40 @@
+# Files Docker never sends to the build ("the build context"). The Dockerfile
+# only copies pyproject.toml, README.md and src/; this list makes sure nothing
+# else can slip in by mistake, and keeps builds fast.
+
+# Version control and CI
+.git
+.github
+
+# Secrets: API keys and passwords must never end up in an image.
+.env
+.env.*
+!.env.example
+
+# Local environments and Python caches
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+build
+dist
+
+# Data and results: the corpus is mounted at run time, never baked in.
+# (data/raw and data/processed are rebuilt with `eurlex ingest`; data/gold is
+# the benchmark, which the service does not need.)
+data
+results
+artifacts
+
+# Not needed at run time
+tests
+docs
+
+# Editor and OS noise
+.vscode
+.idea
+.DS_Store

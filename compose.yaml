@@ -1,0 +1,83 @@
+# The whole stack on one machine: the database and the HTTP service.
+#
+#   docker compose up --build     build the app image and start both services
+#   docker compose ps             see their state (and whether they are healthy)
+#   docker compose logs -f app    follow the service's logs
+#   docker compose down           stop them (add -v to also delete the database)
+#
+# Before the first start, build the corpus on the host with `eurlex ingest`, so
+# that data/processed/units.jsonl exists. Without it the app still starts and
+# http://localhost:8000/healthz answers 503 saying what is missing.
+
+# Each entry under "services" is one container.
+services:
+  # PostgreSQL with the pgvector extension, which adds a vector column type and
+  # nearest-neighbour search to SQL.
+  # NOTE: no code uses the database yet. It becomes the home of the embeddings in
+  # milestone M3 (dense retrieval). It is included now so the stack can be
+  # brought up and looked at, e.g. with
+  #   docker compose exec db psql -U eurlex -c "CREATE EXTENSION IF NOT EXISTS vector;"
+  db:
+    # The official pgvector image: PostgreSQL 17 with the extension preinstalled.
+    image: pgvector/pgvector:pg17
+    # The postgres image creates this user, password and database on first start.
+    # They match DATABASE_URL in .env.example. Fine for a local development
+    # database; a deployed one would take them from a secret instead.
+    environment:
+      POSTGRES_USER: eurlex
+      POSTGRES_PASSWORD: eurlex
+      POSTGRES_DB: eurlex
+    # Make the database reachable from the host at localhost:5432
+    # (host port on the left, container port on the right).
+    ports:
+      - "5432:5432"
+    # Keep the database files in a named volume (declared at the bottom), so the
+    # data survives `docker compose down` and container rebuilds.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # "Healthy" means PostgreSQL accepts connections. pg_isready ships with
+    # PostgreSQL and checks exactly that. $$ is how compose writes a literal $,
+    # so the variable is read inside the container, not by compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Start again automatically if it crashes, unless it was stopped on purpose.
+    restart: unless-stopped
+
+  # The FastAPI service (see Dockerfile and src/eurlex_rag/api/app.py).
+  app:
+    # Build the image from the Dockerfile in this directory.
+    build: .
+    # The service listens on 8000 inside the container; publish it on the host.
+    ports:
+      - "8000:8000"
+    # Mount the host's data/processed directory at /data, where the image looks
+    # for units.jsonl (EURLEX_UNITS=/data/units.jsonl). ":ro" means read-only:
+    # the service reads the corpus and can never modify it. (If data/processed
+    # does not exist yet, Docker creates it empty, owned by root.)
+    volumes:
+      - ./data/processed:/data:ro
+    # Load settings and keys from .env if it exists (it is git-ignored). Optional,
+    # so the stack also starts on a fresh clone with no .env yet.
+    env_file:
+      - path: .env
+        required: false
+    # Container-side settings. The database's address inside compose is its
+    # service name, "db", not localhost; this overrides the localhost URL that
+    # .env.example uses for code run directly on the host.
+    environment:
+      DATABASE_URL: postgresql://eurlex:eurlex@db:5432/eurlex
+      EURLEX_UNITS: /data/units.jsonl
+    # Start the app only after the database reports healthy. Not needed by any
+    # code until M3, but it is the order the stack will need then.
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+# Named volumes managed by Docker. Listed here so compose creates them once and
+# reuses them on every start.
+volumes:
+  pgdata:
