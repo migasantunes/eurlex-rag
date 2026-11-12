@@ -112,7 +112,7 @@ verified languages" without overclaiming.
   paired bootstrap between consecutive rungs. With ~60 test questions the
   intervals will be wide, and the write-up says so instead of reporting
   differences that are inside the noise.
-- **Reproducibility.** Each run writes `results/<rung>-<date>.json` with the
+- **Reproducibility.** Each run writes `results/<rung>__<split>.json` with the
   config, model IDs, corpus hashes, git commit and per-query outputs. Numbers
   in the README are generated from these files, never typed by hand.
 
