@@ -140,7 +140,7 @@ The judge model differs from the answering model.
 - Every pull request: unit tests + a **retrieval smoke-eval** on ~30 dev
   queries. No LLM calls, runs in under a minute, fails the build if Recall@5
   drops below the committed threshold.
-- Full evaluation (`make eval RUNG=…`) is run by hand at the end of each
+- Full evaluation (`eurlex eval`) is run by hand at the end of each
   milestone, because it costs tokens.
 
 ## 7. The results table (target shape)

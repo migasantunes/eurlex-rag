@@ -1,10 +1,14 @@
 # eurlex-rag — Milestone plan
 
-Status: draft v1 (12 Nov 2026). Read [SPEC.md](SPEC.md) and [EVAL.md](EVAL.md) first.
+Status: v2 (12 Nov 2026), updated after the bootstrap session. Read [SPEC.md](SPEC.md) and [EVAL.md](EVAL.md) first.
 
-Eight milestones, each about one focused Claude Code session plus Miguel's
-part. Each one ends with: a merged pull request, a results file where
-applicable, and a decision note.
+Eight milestones. M0 is done; each of the others is about one focused Claude
+Code session plus Miguel's part, and ends with: a merged pull request, result
+files where applicable, a defend note, and a decision note.
+
+A rung is complete when it has: code behind the `Retriever` interface, tests
+that need no download, result files from a real run, an updated spec in
+`docs/rungs/`, and a note in `docs/defend/`.
 
 ## How the work is run
 
@@ -25,33 +29,51 @@ and why.
 
 ---
 
-## M0 — Scaffold
+## M0 — Scaffold (built in the bootstrap session)
 
-**Goal:** an empty project that builds, tests and runs.
+**Goal:** a project that installs, tests and runs end to end on a toy corpus.
 
-- `pyproject.toml` (uv), ruff, pytest, package skeleton per SPEC §6
-- `compose.yaml` with PostgreSQL + pgvector; `Dockerfile` for the app
-- `Makefile`: `setup`, `test`, `lint`, `up`, `ingest`, `eval`
-- GitHub Actions: lint + tests
-- `.env.example`; secrets never committed
+Built:
 
-**Done when:** `make up && make test` passes locally and in CI.
-**Your part:** run it on your machine; read the Dockerfile line by line and ask
-about anything unclear. Estimated 30 min.
+- Package layout, unit IDs, the JSONL units file, chunking, the `Retriever`
+  interface, a hand-written BM25 (rung 01) and the rung registry
+- Ingestion code: fetcher with cache and manifest, parser, alignment checks
+- Evaluation harness: gold-set loader, metrics, bootstrap intervals, runner,
+  result files, generated table
+- `eurlex` command line: `rungs`, `ingest`, `search`, `eval`, `report`
+- Citation extraction and validation; FastAPI service with `/retrieve`
+- `Dockerfile`, `compose.yaml` (app + PostgreSQL with pgvector), CI
+- Specs for every rung in `docs/rungs/`, first note in `docs/defend/`
+
+**Not verified in M0**, because the bootstrap environment could not reach
+EUR-Lex, Docker or a GPU:
+
+- The parser has only seen synthetic fixtures, never a real EUR-Lex file
+- The download routes are untested against the real servers
+- The Docker image and `compose.yaml` have never been built or started
+- No real corpus, no benchmark, so **no numbers of any kind**
+
+**Your part:** clone, `pip install -e ".[dev,serve,ingest]"`, run `pytest`,
+then `docker compose up --build` and open `localhost:8000/healthz`. Read the
+Dockerfile and `compose.yaml` line by line and ask about anything unclear.
+Estimated 45 min.
 
 ## M1 — Ingestion
 
 **Goal:** the five regulations as clean, ID-addressed units in six languages.
 
-- Settle the access route and attribution wording (SPEC §2); cache raw files
-  with hashes
-- Parser: articles, paragraphs, recitals, annexes → `units` table
-- Parallel lookup table (PT, FR, ES, DE, IT)
-- Tests: same ID set in every language; no empty units; counts per regulation
-  match the published structure
+- Run `eurlex ingest` on the owner's machine. Settle which download route
+  works and the attribution wording (SPEC §2). If neither route works, download
+  the 30 files by hand into `data/raw/` and run `eurlex ingest --no-fetch`
+- Fix the parser against the real files until the alignment checks pass: same
+  ID set in every language, no empty units, article and recital counts matching
+  the published texts
+- Save two or three real documents (trimmed) as regression fixtures for the
+  parser tests
 
-**Done when:** `make ingest` rebuilds the database from scratch and all
-alignment tests pass.
+**Done when:** `eurlex ingest` rebuilds `data/processed/units.jsonl` from
+scratch with no reported problems, and `eurlex search` returns sensible
+articles for a few English queries.
 **Your part:** open 10 random articles in EN, PT and FR side by side and
 confirm they are the same article. Estimated 30 min.
 
@@ -60,9 +82,9 @@ confirm they are the same article. Estimated 30 min.
 **Goal:** a trustworthy gold set, a runner, and the first row of the table.
 
 - Gold set generation pipeline and automatic checks (EVAL §3)
-- Metrics module with unit tests on hand-computed cases
-- Runner: `make eval RUNG=1` → `results/*.json` → table
-- Rung 1: BM25, on raw queries and on translated queries
+- Rung 01 measured with the existing harness: `eurlex eval --rung 01_bm25`,
+  then `eurlex report` (the translated-query row follows in M4)
+- BM25 variants on dev: stemming, `k1`/`b`, article vs paragraph chunks
 - Review tool for verification (a simple CLI or page: question in three
   languages, gold article, accept / edit / reject)
 

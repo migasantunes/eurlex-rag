@@ -1,6 +1,6 @@
 # eurlex-rag — System specification
 
-Status: draft v1 (12 Nov 2026). Owner: Miguel Antunes.
+Status: v2 (12 Nov 2026), updated after the bootstrap session. Owner: Miguel Antunes.
 Companion documents: [EVAL.md](EVAL.md) (how we measure), [PLAN.md](PLAN.md) (milestones).
 
 ## 1. What this is
@@ -102,23 +102,24 @@ Chunking strategy is itself an experiment variable in M3, not a fixed choice.
                        attach official text of cited articles (user's language)
 ```
 
-Square brackets mark stages that only exist from a given rung onwards. The
-pipeline is assembled from a config file, so that every rung can be run and
-re-run on the benchmark by name.
+Square brackets mark stages that only exist from a given rung onwards. Every
+rung is registered by name (`src/eurlex_rag/registry.py`), so it can be run
+and re-run on the benchmark with one command.
 
 ### Components
 
 | Component | Choice | Note |
 |---|---|---|
-| Language | Python 3.12 | `uv` for environments, `ruff`, `pytest` |
-| Store | PostgreSQL + pgvector | one database for text, metadata and vectors |
-| Lexical | BM25 (in-process, `bm25s`) | true BM25; Postgres full-text as a compared alternative |
+| Language | Python ≥ 3.11 | `pip` + `pyproject.toml`, `ruff`, `pytest`; the core has no third-party dependencies |
+| Units | JSON Lines file | all parsed text, all languages; no database needed for rung 01 or the harness |
+| Vectors | PostgreSQL + pgvector | from M3 |
+| Lexical | BM25, written by hand | readable end to end; Postgres full-text as a compared alternative |
 | Embeddings | multilingual open-weight model | BGE-M3 as the starting candidate; re-check the field at M3 and compare at least two |
 | Reranker | multilingual cross-encoder | candidate chosen at M4 |
 | LLM | behind a provider interface | hosted open model by default; model and provider fixed per results run and recorded |
 | Agent | LangGraph | rung 6 only; nothing else depends on it |
 | API | FastAPI | `/ask`, `/retrieve`, `/health` |
-| UI | one page | question box, answer, cited articles side by side |
+| UI | one page (M7) | question box, answer, cited articles side by side |
 | Packaging | Docker + Compose | app + database |
 | CI | GitHub Actions | lint, tests, retrieval smoke-eval with thresholds |
 
@@ -175,20 +176,22 @@ Response shape:
 
 ```
 src/eurlex_rag/
-  ingest/      fetch, parse, units, parallel table
-  index/       chunking, BM25, embeddings, pgvector
-  retrieve/    one module per retriever + fusion + rerank
-  transform/   language detection, translation, rewriting
-  generate/    prompts, provider interface, citation validation
-  agent/       rung 6
-  eval/        metrics, runner, reports
+  ids.py corpus.py types.py store.py    IDs, the five regulations, records, units file
+  ingest/      fetch, parse, alignment checks, pipeline
+  index/       chunking (BM25 index lives with its retriever; vectors from M3)
+  retrieve/    Retriever interface + one module per rung
+  generate/    citation validation (prompts and provider interface from M5)
+  eval/        gold set, metrics, bootstrap, runner, results, report
   api/         FastAPI app
-configs/       one YAML per rung
-data/gold/     benchmark (committed)
-data/raw/      downloaded sources (git-ignored, reproducible via make)
-results/       one JSON per run + the summary table
-docs/          this spec, eval design, plan, decision notes
-tests/
+  agent/       rung 06 (M6)
+  registry.py  rung name -> retriever
+  cli.py       the `eurlex` command
+data/gold/     benchmark (committed, from M2)
+data/raw/      downloaded sources (git-ignored, rebuilt by `eurlex ingest`)
+data/processed/ parsed units (git-ignored, rebuilt)
+results/       one JSON per run + the generated table (committed)
+docs/          spec, eval design, plan, rungs/, defend/, decisions/
+tests/         synthetic corpus, no downloads
 ```
 
 ## 7. Risks
